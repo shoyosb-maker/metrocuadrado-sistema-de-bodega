@@ -171,3 +171,7 @@ const Charts = (() => {
     renderEventosEstado
   };
 })();
+
+// ⚠️ FIX: exponer en window para que app.js lo vea con `window.Charts`
+// (una const de nivel superior NO se pega a window por defecto)
+window.Charts = Charts;
