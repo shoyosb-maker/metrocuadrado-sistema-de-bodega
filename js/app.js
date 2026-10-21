@@ -1,8 +1,8 @@
 /**
- * Punto de entrada de la aplicación v11.3
+ * Punto de entrada de la aplicación v11.4
  * - XSS-safe (UI.esc en todo dato de backend)
+ * - Dashboard expandido: KPIs eventos + financieros + gráficos nuevos
  * - Filtro de productos inactivos con toggle
- * - Sin importación CSV
  */
 const App = (() => {
   const state = {
@@ -58,7 +58,6 @@ const App = (() => {
       renderProductsTable();
     }, 250));
 
-    // Toggle "Ver inactivos"
     document.getElementById('show-inactive-products')?.addEventListener('change', e => {
       state.filters.showInactiveProducts = e.target.checked;
       state.pagination.products = 1;
@@ -155,7 +154,6 @@ const App = (() => {
       user: null, products: [], requests: [], users: [], audit: [], movements: [],
       bodegas: [], proveedores: [], ordenes: [], stats: null, financeStats: null
     });
-    // Resetear UI del toggle para que no quede desincronizado
     const toggle = document.getElementById('show-inactive-products');
     if (toggle) toggle.checked = false;
     state.filters.showInactiveProducts = false;
@@ -237,9 +235,12 @@ const App = (() => {
     if (content) content.scrollTop = 0;
   }
 
+  // ===== DASHBOARD =====
   async function renderDashboard() {
     renderRoute('dashboard');
     const st = state.stats || {};
+
+    // KPIs inventario
     document.getElementById('stat-total-products').textContent = st.totalProducts ?? '—';
     document.getElementById('stat-total-stock').textContent = st.totalStock ?? '—';
     document.getElementById('stat-low-stock').textContent = st.lowStock ?? '—';
@@ -248,22 +249,42 @@ const App = (() => {
     document.getElementById('stat-eventos-activos').textContent = st.eventosActivos ?? '—';
     document.getElementById('stat-materiales-calle').textContent = st.materialesEnCalle ?? '—';
 
+    // KPIs eventos
+    document.getElementById('stat-eventos-totales').textContent = st.eventosTotales ?? '—';
+    document.getElementById('stat-eventos-finalizados').textContent = st.eventosFinalizados ?? '—';
+    document.getElementById('stat-eventos-cancelados').textContent = st.eventosCancelados ?? '—';
+
+    // KPIs financieros (solo admin)
+    if (Permissions.canSeeFinance()) {
+      const fmt = v => '$' + Number(v || 0).toLocaleString();
+      const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      setEl('stat-ingresos-eventos', fmt(st.ingresosEventos));
+      setEl('stat-gastos-eventos', fmt(st.gastosEventos));
+      setEl('stat-utilidad-eventos', fmt(st.utilidadEventos));
+    }
+
+    // Gráficos
     if (st.topProducts && window.Charts) Charts.renderTopProducts('chart-top-products', st.topProducts);
     if (st.byStatus && window.Charts) Charts.renderStatusDoughnut('chart-status', st.byStatus);
+    if (st.eventosPorEstado && window.Charts) Charts.renderEventosEstado('chart-eventos-estado', st.eventosPorEstado);
 
+    if (st.topEventos && window.Charts && Permissions.canSeeFinance()) {
+      Charts.renderTopEventos('chart-top-eventos', st.topEventos);
+    }
     if (state.financeStats && window.Charts && Permissions.canSeeFinance()) {
       Charts.renderFinanceChart('chart-finance', state.financeStats);
     }
 
+    // Bajo stock
     const low = state.products.filter(p =>
       (p.Activo !== false && p.Activo !== 'FALSE') &&
       Number(p.Stock) <= Number(p.Stock_Min)
     );
-    const container = document.getElementById('low-stock-list');
+    const lowContainer = document.getElementById('low-stock-list');
     if (low.length === 0) {
-      UI.emptyState(container, { icon: '✅', title: 'Todo en orden', message: 'No hay productos con bajo stock' });
+      UI.emptyState(lowContainer, { icon: '✅', title: 'Todo en orden', message: 'No hay productos con bajo stock' });
     } else {
-      UI.renderTable(container, {
+      UI.renderTable(lowContainer, {
         columns: [
           { key: 'Nombre', label: 'Producto' },
           { key: 'SKU', label: 'SKU' },
@@ -275,8 +296,34 @@ const App = (() => {
         rows: low
       });
     }
+
+    // Solicitudes pendientes
+    renderPendingRequestsTable(st.solicitudesPendientesList || []);
   }
 
+  function renderPendingRequestsTable(rows) {
+    const container = document.getElementById('pending-requests-list');
+    if (!container) return;
+
+    if (!rows || rows.length === 0) {
+      UI.emptyState(container, { icon: '✅', title: 'Sin solicitudes pendientes', message: 'Todo aprobado o rechazado' });
+      return;
+    }
+
+    UI.renderTable(container, {
+      columns: [
+        { key: 'ID_Solicitud', label: 'ID' },
+        { key: 'Fecha', label: 'Fecha', render: r => r.Fecha ? UI.esc(new Date(r.Fecha).toLocaleDateString()) : '—' },
+        { key: 'Producto', label: 'Producto' },
+        { key: 'Cantidad', label: 'Cant.' },
+        { key: 'Solicitante', label: 'Solicitante' },
+        { key: 'Bodega', label: 'Bodega', render: r => UI.esc(getBodegaName(r.Bodega)) }
+      ],
+      rows
+    });
+  }
+
+  // ===== PRODUCTOS =====
   function renderProductos() { renderRoute('productos'); renderProductsTable(); }
 
   function renderProductsTable() {
@@ -284,11 +331,9 @@ const App = (() => {
     const showInactive = !!state.filters.showInactiveProducts;
 
     const filtered = state.products.filter(p => {
-      // 1) Excluir inactivos si no están visibles
       const inactivo = (p.Activo === false || p.Activo === 'FALSE');
       if (!showInactive && inactivo) return false;
 
-      // 2) Búsqueda
       const s = state.filters.search;
       if (!s) return true;
       return (p.Nombre || '').toLowerCase().includes(s) ||
@@ -615,6 +660,7 @@ const App = (() => {
     Permissions.apply();
   }
 
+  // ===== BODEGAS =====
   function renderBodegas() { renderRoute('bodegas'); renderBodegasTable(); }
   function renderBodegasTable() {
     const container = document.getElementById('bodegas-table-container');
@@ -661,6 +707,7 @@ const App = (() => {
     try { await API.deleteBodega({ ID: id }); UI.toast('Bodega desactivada', 'success'); await loadAllData(); renderBodegasTable(); } catch (e) { UI.toast('Error: ' + e.message, 'error'); }
   }
 
+  // ===== PROVEEDORES =====
   function renderProveedores() { renderRoute('proveedores'); renderProveedoresTable(); }
   function renderProveedoresTable() {
     const container = document.getElementById('proveedores-table-container');
@@ -706,6 +753,7 @@ const App = (() => {
     try { await API.deleteProveedor({ ID: id }); UI.toast('Proveedor desactivado', 'success'); await loadAllData(); renderProveedoresTable(); } catch (e) { UI.toast('Error: ' + e.message, 'error'); }
   }
 
+  // ===== ÓRDENES =====
   function renderOrdenes() { renderRoute('ordenes'); renderOrdenesTable(); }
   function renderOrdenesTable() {
     const container = document.getElementById('ordenes-table-container');
@@ -798,6 +846,7 @@ const App = (() => {
     try { const r = await API.generarOrdenesAuto({}); UI.toast(r.mensaje || `Órdenes: ${r.count}`, r.count > 0 ? 'success' : 'info', 4000); await loadAllData(); if (Router.getCurrent() === 'ordenes') renderOrdenesTable(); if (Router.getCurrent() === 'dashboard') renderDashboard(); } catch (e) { UI.toast('Error: ' + e.message, 'error'); }
   }
 
+  // ===== SOLICITUDES =====
   function renderSolicitudes() { renderRoute('solicitudes'); renderRequestsTable(); }
   function renderRequestsTable() {
     const container = document.getElementById('requests-table-container');
@@ -862,6 +911,7 @@ const App = (() => {
     catch (err) { UI.toast('Error: ' + err.message, 'error'); } finally { btn.disabled = false; btn.textContent = 'Enviar Solicitud'; }
   }
 
+  // ===== MOVIMIENTOS =====
   function renderMovimientos() { renderRoute('movimientos'); renderMovementsTable(); }
   function renderMovementsTable() {
     const container = document.getElementById('movements-table-container');
@@ -945,6 +995,7 @@ const App = (() => {
     });
   }
 
+  // ===== USUARIOS =====
   function renderUsuarios() { renderRoute('usuarios'); renderUsersTable(); }
   function renderUsersTable() {
     const container = document.getElementById('users-table-container');
@@ -1007,6 +1058,7 @@ const App = (() => {
     try { await API.deleteUser({ Email: email }); UI.toast('Usuario desactivado', 'success'); await loadAllData(); renderUsersTable(); } catch (e) { UI.toast('Error: ' + e.message, 'error'); }
   }
 
+  // ===== AUDITORÍA =====
   function renderAuditoria() { renderRoute('auditoria'); renderAuditTable(); }
   function renderAuditTable() {
     const container = document.getElementById('audit-table-container');
@@ -1027,6 +1079,7 @@ const App = (() => {
     });
   }
 
+  // ===== EXPORTACIÓN =====
   async function handleExportCSV() {
     try { const { csv, count } = await API.exportRequestsCSV(state.filters); if (!count) { UI.toast('No hay datos para exportar', 'warning'); return; } Exporter.downloadCSV(csv, `solicitudes-${Date.now()}.csv`); UI.toast(`Exportadas ${count} solicitudes`, 'success'); }
     catch (e) { UI.toast('Error: ' + e.message, 'error'); }
@@ -1037,6 +1090,7 @@ const App = (() => {
     Exporter.downloadPDF('Reporte de Solicitudes', cols, rows);
   }
 
+  // ===== UTILIDADES =====
   function debounce(fn, delay) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), delay); }; }
   function fileToBase64(file) { return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result.split(',')[1]); r.onerror = reject; r.readAsDataURL(file); }); }
 
