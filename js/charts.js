@@ -66,20 +66,20 @@ const Charts = (() => {
           {
             label: 'Ingresos ($)',
             data: data.ingresos,
-            backgroundColor: '#10b981', // Verde
+            backgroundColor: '#10b981',
             borderRadius: 4
           },
           {
             label: 'Gastos ($)',
             data: data.gastos,
-            backgroundColor: '#ef4444', // Rojo
+            backgroundColor: '#ef4444',
             borderRadius: 4
           },
           {
             label: 'Utilidad ($)',
             data: data.utilidad,
             type: 'line',
-            borderColor: '#2563eb', // Azul
+            borderColor: '#2563eb',
             backgroundColor: '#2563eb',
             borderWidth: 2,
             fill: false,
@@ -90,15 +90,84 @@ const Charts = (() => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  function renderTopEventos(canvasId, data) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    instances[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.cliente),
+        datasets: [{
+          label: 'Facturado ($)',
+          data: data.map(d => d.total),
+          backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom' }
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => '$' + Number(ctx.raw || 0).toLocaleString()
+            }
+          }
         },
         scales: {
-          y: { beginAtZero: true }
+          x: {
+            beginAtZero: true,
+            ticks: {
+              callback: v => '$' + Number(v).toLocaleString()
+            }
+          }
         }
       }
     });
   }
 
-  return { renderTopProducts, renderStatusDoughnut, renderFinanceChart };
+  function renderEventosEstado(canvasId, byEstado) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    instances[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Pendiente', 'En Progreso', 'Finalizado', 'Cancelado'],
+        datasets: [{
+          data: [
+            byEstado.Pendiente || 0,
+            byEstado['En Progreso'] || 0,
+            byEstado.Finalizado || 0,
+            byEstado.Cancelado || 0
+          ],
+          backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#ef4444'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        cutout: '65%'
+      }
+    });
+  }
+
+  return {
+    renderTopProducts,
+    renderStatusDoughnut,
+    renderFinanceChart,
+    renderTopEventos,
+    renderEventosEstado
+  };
 })();
