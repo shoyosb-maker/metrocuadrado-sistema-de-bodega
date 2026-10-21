@@ -131,6 +131,7 @@
 
         <!-- ===== DASHBOARD ===== -->
         <section id="view-dashboard" class="route-view">
+          <!-- Fila 1: KPIs inventario -->
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-icon stat-icon-blue">📦</div>
@@ -162,9 +163,42 @@
             </div>
           </div>
 
+          <!-- Fila 2: KPIs eventos -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-blue">📊</div>
+              <div class="stat-info"><span class="stat-label">Eventos Totales</span><span class="stat-value" id="stat-eventos-totales">--</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-green">✅</div>
+              <div class="stat-info"><span class="stat-label">Eventos Finalizados</span><span class="stat-value" id="stat-eventos-finalizados">--</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-orange">❌</div>
+              <div class="stat-info"><span class="stat-label">Eventos Cancelados</span><span class="stat-value" id="stat-eventos-cancelados">--</span></div>
+            </div>
+          </div>
+
+          <!-- Fila 3: KPIs financieros (solo admin) -->
+          <div class="stats-grid" data-perm="admin">
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-green">💰</div>
+              <div class="stat-info"><span class="stat-label">Ingresos por Eventos</span><span class="stat-value" id="stat-ingresos-eventos" style="color: var(--color-success);">--</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-orange">💸</div>
+              <div class="stat-info"><span class="stat-label">Gastos en Compras</span><span class="stat-value" id="stat-gastos-eventos" style="color: var(--color-danger);">--</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon-blue">📈</div>
+              <div class="stat-info"><span class="stat-label">Utilidad</span><span class="stat-value" id="stat-utilidad-eventos" style="color: var(--color-primary);">--</span></div>
+            </div>
+          </div>
+
+          <!-- Balance financiero mensual (solo admin) -->
           <div class="card" id="finance-card-container" data-perm="admin" style="margin-bottom: var(--space-lg);">
             <div class="card-header card-header-flex">
-              <h3>Balance Financiero (Ingresos vs Gastos)</h3>
+              <h3>Balance Financiero Mensual (Ingresos vs Gastos)</h3>
             </div>
             <div class="card-body">
               <div class="chart-wrapper" style="height: 320px;">
@@ -173,6 +207,7 @@
             </div>
           </div>
 
+          <!-- Fila 4: Top productos + Solicitudes por estado -->
           <div class="charts-grid">
             <div class="card">
               <div class="card-header"><h3>Top 5 productos más solicitados</h3></div>
@@ -184,9 +219,31 @@
             </div>
           </div>
 
-          <div class="card">
-            <div class="card-header"><h3>Productos con bajo stock</h3></div>
-            <div class="card-body" id="low-stock-list"><div class="loading">Cargando...</div></div>
+          <!-- Fila 5: Top eventos + Eventos por estado -->
+          <div class="charts-grid">
+            <div class="card" data-perm="admin">
+              <div class="card-header"><h3>Top 5 eventos por facturación</h3></div>
+              <div class="card-body"><div class="chart-wrapper"><canvas id="chart-top-eventos"></canvas></div></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Eventos por estado</h3></div>
+              <div class="card-body"><div class="chart-wrapper"><canvas id="chart-eventos-estado"></canvas></div></div>
+            </div>
+          </div>
+
+          <!-- Fila 6: Bajo stock + Solicitudes pendientes -->
+          <div class="charts-grid">
+            <div class="card">
+              <div class="card-header"><h3>Productos con bajo stock</h3></div>
+              <div class="card-body" id="low-stock-list"><div class="loading">Cargando...</div></div>
+            </div>
+            <div class="card">
+              <div class="card-header card-header-flex">
+                <h3>Solicitudes pendientes recientes</h3>
+                <a href="#/solicitudes" class="btn btn-ghost btn-sm">Ver todas →</a>
+              </div>
+              <div class="card-body" id="pending-requests-list"><div class="loading">Cargando...</div></div>
+            </div>
           </div>
         </section>
 
